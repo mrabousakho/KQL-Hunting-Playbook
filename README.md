@@ -402,6 +402,19 @@ PLAYBOOK FOR THREAT HUNTING
               TaskName, ProcessCommandLine, InitiatingProcessFileName
     | sort by Timestamp asc
 
+    // SCHEDULED TASK PERSISTENCE DETECTION
+    // MITRE: T1053.005 — Scheduled Task/Job
+    // Table: DeviceEvents (preferred over DeviceProcessEvents)
+    // Use when: Investigating persistence mechanisms after compromise
+
+    DeviceEvents
+    | where DeviceName contains "TARGET_DEVICE"
+    | where ActionType == "ScheduledTaskCreated"
+    | extend TaskName = tostring(parse_json(AdditionalFields).TaskName)
+    | extend Command = tostring(parse_json(AdditionalFields).TaskContent)
+    | extend CreatedBy = tostring(parse_json(AdditionalFields).SubjectUserName)
+    | project TimeGenerated, CreatedBy, TaskName, Command
+    | sort by TimeGenerated asc
 * * *
 
 ### 22 — AnyDesk Silent Install Detection
