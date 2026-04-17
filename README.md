@@ -83,6 +83,13 @@ PLAYBOOK FOR THREAT HUNTING
     | where SuccessCount > 0 and FailCount > 0
     | sort by FailCount desc
 
+        // PIVOT: From attacker IP to compromised account
+    DeviceLogonEvents
+    | where DeviceName contains "TARGET_DEVICE"
+    | where RemoteIP == "ATTACKER_IP"
+    | where ActionType == "LogonSuccess"
+    | distinct AccountName
+
 * * *
 
 ### 02 — MFA Fatigue Detection
