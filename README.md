@@ -1,0 +1,2 @@
+# KQL-Hunting-Playbook
+PLAYBOOK FOR THREAT HUNTING
