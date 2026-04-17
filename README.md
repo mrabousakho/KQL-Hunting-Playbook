@@ -465,7 +465,23 @@ PLAYBOOK FOR THREAT HUNTING
     | sort by Timestamp asc
 
 * * *
+### 25 — Suspicious Binary Detection
+// SUSPICIOUS BINARY IN WORLD-WRITABLE LOCATION
+// MITRE: T1204.002 — User Execution: Malicious File
+DeviceProcessEvents
+| where DeviceName contains "TARGET_DEVICE"
+| where AccountName == "TARGET_ACCOUNT"
+| where FolderPath has_any (
+    "\\Users\\Public",
+    "\\Temp",
+    "\\Downloads",
+    "\\AppData\\Roaming",
+    "\\AppData\\Local\\Temp")
+| project Timestamp, FileName, FolderPath,
+          ProcessCommandLine, InitiatingProcessFileName
+| sort by Timestamp asc
 
+* * *
 ## Key Azure AD Error Codes Reference
 
 | Code | Meaning | Investigation Use |
