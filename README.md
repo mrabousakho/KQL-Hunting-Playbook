@@ -535,8 +535,11 @@ DeviceFileEvents
 | where ActionType == "FileCreated"
 | project TimeGenerated, FileName, ActionType, FolderPath
 | order by TimeGenerated asc
-
-
+### Note that Action type could be :
+- FileCreated
+- FileDeleted
+- FileModified
+- FileRenamed
 * * *
 ## Key Azure AD Error Codes Reference
 
