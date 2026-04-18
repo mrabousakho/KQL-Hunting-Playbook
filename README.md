@@ -522,6 +522,22 @@ DeviceProcessEvents
 | sort by TimeGenerated asc
 
 * * *
+### 27 — System Discovery
+After gathering sensitive data, the attacker prepared it for exfiltration by compressing
+the contents into an archive file on the local system.
+These file are zipped and stage for exfilteration. Search for these file in DeviceFileEvents
+with this query :
+
+DeviceFileEvents
+| where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+| where DeviceName == "slflarewinsysmo"
+| where FileName has_any (".zip", ".rar", ".7z")
+| where ActionType == "FileCreated"
+| project TimeGenerated, FileName, ActionType, FolderPath
+| order by TimeGenerated asc
+
+
+* * *
 ## Key Azure AD Error Codes Reference
 
 | Code | Meaning | Investigation Use |
