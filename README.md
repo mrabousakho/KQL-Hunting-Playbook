@@ -282,6 +282,34 @@ PLAYBOOK FOR THREAT HUNTING
               FileName, ProcessCommandLine, InitiatingProcessFileName
     | sort by Timestamp asc
 
+    ##==================
+    # C2 
+    ## is one of the most important discovery in Threat Hunting
+    Go general first:
+    DeviceNetworkEvents
+    | where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+    | where DeviceName == "slflarewinsysmo"
+    | where InitiatingProcessFileName in (
+    "powershell.exe", "cmd.exe", "msupdate.exe",
+    "wscript.exe", "cscript.exe", "mshta.exe")
+    | where RemoteIPType == "Public"
+    | summarize ConnectionCount=count(),
+            Ports=make_set(RemotePort),
+            FirstSeen=min(TimeGenerated),
+            LastSeen=max(TimeGenerated)
+      by RemoteIP, InitiatingProcessFileName
+    | sort by ConnectionCount desc
+
+    ## Then narrow down for full pucture with count and timeline
+    DeviceNetworkEvents
+    | where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+    | where DeviceName == "slflarewinsysmo"
+    | where RemoteIP == "185.92.220.87"
+    | project TimeGenerated, InitiatingProcessFileName,
+          RemoteIP, RemotePort, RemoteUrl,
+          InitiatingProcessCommandLine
+    | sort by TimeGenerated asc
+
 * * *
 
 ### 14 — VSS Shadow Copy Abuse (NTDS Extraction)
