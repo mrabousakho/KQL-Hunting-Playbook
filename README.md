@@ -478,7 +478,7 @@ PLAYBOOK FOR THREAT HUNTING
     | sort by Timestamp asc
 
 * * *
-### 25 — Suspicious Binary Detection
+### 26 — Suspicious Binary Detection
 // SUSPICIOUS BINARY IN WORLD-WRITABLE LOCATION
 // MITRE: T1204.002 — User Execution: Malicious File
 DeviceProcessEvents
@@ -493,6 +493,33 @@ DeviceProcessEvents
 | project Timestamp, FileName, FolderPath,
           ProcessCommandLine, InitiatingProcessFileName
 | sort by Timestamp asc
+
+* * *
+### 27 — System Discovery
+If you already have the account Name, that will narrow the search
+the file name will have system in it like systeminfo systeminfo.exe
+the initiating process is mostly cmd.exe
+start broad:
+DeviceProcessEvents
+| where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+| where DeviceName contains "flare"
+| where ProcessCommandLine has_any (
+    "systeminfo", "whoami", "net user",
+    "net localgroup", "ipconfig", "netstat",
+    "tasklist", "wmic computersystem",
+    "query user", "nltest")
+| project TimeGenerated, AccountName, FileName,
+          ProcessCommandLine, InitiatingProcessFileName
+| sort by TimeGenerated asc
+### and if the data is too large, try
+DeviceProcessEvents
+| where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+| where DeviceName == "slflarewinsysmo"
+| where FileName == "systeminfo.exe"
+    or ProcessCommandLine has "systeminfo"
+| project TimeGenerated, AccountName, FileName,
+          ProcessCommandLine, InitiatingProcessFileName
+| sort by TimeGenerated asc
 
 * * *
 ## Key Azure AD Error Codes Reference
