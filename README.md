@@ -53,6 +53,68 @@ PLAYBOOK FOR THREAT HUNTING
 ## The Queries
 
 * * *
+# Run this PowerShell investigation at the beginning of EndPoint investigation
+DeviceEvents
+| where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+| where DeviceName == "slflarewinsysmo"
+| where ActionType == "PowerShellCommand"
+| where InitiatingProcessAccountName != "system"
+| extend Command = tostring(parse_json(AdditionalFields).Command)
+| project TimeGenerated, Command, FileName, FileOriginIP, InitiatingProcessAccountName
+| sort by TimeGenerated asc
+* * *
+
+# Defender Exclusion Detection Has Multiple Paths
+## Path 1 — Process execution (most common):
+DeviceProcessEvents
+| where ProcessCommandLine has_any (
+    "Add-MpPreference", "Set-MpPreference",
+    "ExclusionPath", "DisableRealtimeMonitoring")
+| project TimeGenerated, AccountName,
+          ProcessCommandLine, InitiatingProcessFileName
+| sort by TimeGenerated asc
+
+## Path 3 — Registry (when DeviceRegistryEvents is populated):
+DeviceRegistryEvents
+| where RegistryKey has "Windows Defender"
+| where RegistryKey has "Exclusions"
+| project TimeGenerated, AccountName,
+          RegistryKey, RegistryValueName,
+          InitiatingProcessFileName
+| sort by TimeGenerated asc
+
+## Path 2 — PowerShell commands (catches script-based changes):
+DeviceEvents
+| where ActionType == "PowerShellCommand"
+| extend Command = tostring(parse_json(AdditionalFields).Command)
+| where Command has_any (
+    "Add-MpPreference", "ExclusionPath",
+    "DisableRealtimeMonitoring")
+| project TimeGenerated, Command
+| sort by TimeGenerated asc
+
+
+
+
+## PowerShell commands (catches script-based changes):
+
+DeviceEvents
+| where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+| where ActionType == "PowerShellCommand"
+| extend Command = tostring(parse_json(AdditionalFields).Command)
+| where Command has_any (
+    "Add-MpPreference", "ExclusionPath",
+    "DisableRealtimeMonitoring")
+| project TimeGenerated, Command
+| sort by TimeGenerated asc
+
+* * *
+
+
+
+
+
+* * *
 
 ### 01 — Brute Force RDP Detection
 
