@@ -535,6 +535,20 @@ DeviceFileEvents
 | where ActionType == "FileCreated"
 | project TimeGenerated, FileName, ActionType, FolderPath
 | order by TimeGenerated asc
+
+# or, use
+DeviceFileEvents
+| where TimeGenerated between (datetime(2025-09-15T00:00:00) .. datetime(2025-09-17T23:00:00))
+| where DeviceName == "slflarewinsysmo"
+| where ActionType == "FileCreated"
+| where FileName endswith ".zip"
+    or FileName endswith ".rar"
+    or FileName endswith ".7z"
+| project TimeGenerated, FileName, FolderPath,
+          InitiatingProcessFileName,
+          InitiatingProcessCommandLine
+| sort by TimeGenerated asc
+
 ### Note that Action type could be :
 - FileCreated
 - FileDeleted
