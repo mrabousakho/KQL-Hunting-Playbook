@@ -109,10 +109,17 @@ DeviceEvents
 | sort by TimeGenerated asc
 
 * * *
-
-
-
-
+## Recent File that was manually access
+DeviceFileEvents
+| where TimeGenerated between (
+    datetime(2025-10-09 12:00:00) .. datetime(2025-10-09 14:00:00))
+| where FileName endswith ".lnk"
+| where InitiatingProcessFileName == "explorer.exe"
+| where FolderPath has "Recent"
+| project TimeGenerated, FileName, FolderPath
+| sort by TimeGenerated asc
+----------
+The file end in .Ink and launch by explorer.exe
 
 * * *
 
