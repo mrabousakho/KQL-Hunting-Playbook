@@ -51,7 +51,105 @@ PLAYBOOK FOR THREAT HUNTING
 * * *
 
 ## The Queries
+* * *
+Query Name: Complete Attacker Session Profiler
+Purpose:    Full attacker footprint across all machines in one result
+Key Fields: DwellTime, FilesCreated, FilesDeleted, ProcessCount
+Red Flags:  Zero FailedLogons + high ProcessCount = credential theft
+            FilesDeleted spikes = evidence destruction
+            Multiple DeviceNames = lateral movement confirmed
+---------------------
 
+## Step 1 — Discover the Attacker Device Name from Scratch
+   You only know the date range. Start here:
+   Run this general query to see every external device that logged into your 
+   environment — ranked by activity. The attacker's machine name will be at the top.
+   
+    // STEP 1: Who connected remotely to machines in this time window?
+// No prior knowledge needed — discovers all remote sessions
+DeviceLogonEvents
+| where TimeGenerated between (
+    datetime(2025-10-01) .. datetime(2025-10-15))
+| where LogonType in ("RemoteInteractive", "Network")
+| where ActionType == "LogonSuccess"
+| where RemoteDeviceName != ""
+| where RemoteDeviceName != "-"
+| where not(RemoteIP startswith "10.")
+| where not(RemoteIP startswith "192.168.")
+| where not(RemoteIP startswith "172.")
+| summarize
+    LogonCount=count(),
+    IPsUsed=make_set(RemoteIP),
+    MachinesAccessed=make_set(DeviceName),
+    Accounts=make_set(AccountName),
+    FirstSeen=min(TimeGenerated),
+    LastSeen=max(TimeGenerated)
+  by RemoteDeviceName
+| sort by LogonCount desc
+
+### you start investigating the remote machines like "m4rt1n"
+    you feed that into the master query below: 
+
+
+   
+ // PLAYBOOK: Complete attacker session profiler
+// Combines logon data + process activity + file activity
+let AttackerDevice = "m4rt1n";
+
+// Logon summary
+let Logons = DeviceLogonEvents
+| where RemoteDeviceName =~ AttackerDevice
+| summarize
+    SuccessfulLogons=countif(ActionType == "LogonSuccess"),
+    FailedLogons=countif(ActionType == "LogonFailed"),
+    LogonTypes=make_set(LogonType),
+    IPsUsed=make_set(RemoteIP),
+    FirstLogon=min(TimeGenerated),
+    LastLogon=max(TimeGenerated)
+  by DeviceName;
+
+// Process activity
+let Processes = DeviceProcessEvents
+| where IsInitiatingProcessRemoteSession == true
+| where InitiatingProcessRemoteSessionDeviceName =~ AttackerDevice
+| summarize
+    ProcessCount=count(),
+    UniqueCommands=dcount(ProcessCommandLine),
+    TopCommands=make_set(ProcessCommandLine, 5)
+  by DeviceName;
+
+// File activity
+let Files = DeviceFileEvents
+| where IsInitiatingProcessRemoteSession == true
+| where InitiatingProcessRemoteSessionDeviceName =~ AttackerDevice
+| summarize
+    FilesCreated=countif(ActionType == "FileCreated"),
+    FilesDeleted=countif(ActionType == "FileDeleted"),
+    FileNames=make_set(FileName, 10)
+  by DeviceName;
+
+// Combine everything
+Logons
+| join kind=leftouter Processes on DeviceName
+| join kind=leftouter Files on DeviceName
+| project
+    DeviceName,
+    AttackerDevice,
+    IPsUsed,
+    SuccessfulLogons,
+    FailedLogons,
+    ProcessCount,
+    UniqueCommands,
+    FilesCreated,
+    FilesDeleted,
+    FirstLogon,
+    LastLogon,
+    DwellTime=LastLogon - FirstLogon,
+    FileNames,
+    TopCommands
+    
+    ----------------------------
+            
 * * *
 # Run this PowerShell investigation at the beginning of EndPoint investigation
 DeviceEvents
