@@ -354,6 +354,20 @@ DeviceLogonEvents
     | summarize FailedAttempts=count() by IPAddress
     | sort by FailedAttempts desc
 
+
+* * *
+
+### What was the most common failure reason recorded for RDP-related authentication attempts?
+
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| where LogonType in ("RemoteInteractive", "Network")
+| where ActionType == "LogonFailed"
+| summarize count() by FailureReason
+| order by count_ desc
+
 * * *
 
 ### 03 — Impossible Travel Detection
