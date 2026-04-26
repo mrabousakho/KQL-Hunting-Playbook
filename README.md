@@ -220,6 +220,15 @@ DeviceFileEvents
 | where SHA256 == "224462ce5e3304e3fd0875eeabc829810a894911e3d4091d4e60e67a2687e695"
 | project TimeGenerated, ActionType, FileName, FolderPath
 | order by TimeGenerated asc
+* * *
+### Using the SHA256 from known file, track the file forward through rename events.
+### What is the final observed file name tied to this hash?
+DeviceFileEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where SHA256 == "224462ce5e3304e3fd0875eeabc829810a894911e3d4091d4e60e67a2687e695"
+| project TimeGenerated, ActionType, FileName, FolderPath
+| order by TimeGenerated asc
 
 * * *
 # Defender Exclusion Detection Has Multiple Paths
@@ -251,7 +260,47 @@ DeviceEvents
 | project TimeGenerated, Command
 | sort by TimeGenerated asc
 
+## Microsoft Defender telemetry on the device, what software family is this file classified under?
 
+* * *
+## Windows Defender Detection and Mode
+DeviceEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where ActionType in ("AntivirusDetection", "AntivirusDetectionActionType", "AntivirusReport")
+| extend ParsedFields = parse_json(AdditionalFields)
+| extend ThreatName = tostring(ParsedFields.ThreatName)
+| extend DefenderMode = tostring(ParsedFields.ReportSource)
+| summarize count() by DefenderMode, ThreatName
+| order by count_ desc
+
+
+* * *
+## payload executions . Which process initiated the later phase?
+DeviceProcessEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where FileName == "PHTG.exe"
+    or ProcessCommandLine contains "PHTG.exe"
+| project TimeGenerated, FileName, ProcessCommandLine, 
+    InitiatingProcessFileName, InitiatingProcessCommandLine,
+    InitiatingProcessAccountName
+| order by TimeGenerated asc
+
+* * *
+## //After execution, what external IP did the compromised device attempt to communicate with?
+DeviceNetworkEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where InitiatingProcessSHA256 == "224462ce5e3304e3fd0875eeabc829810a894911e3d4091d4e60e67a2687e695"
+| where RemoteIPType == "Public"
+| project TimeGenerated, RemoteIP, RemotePort,
+    InitiatingProcessFileName, ActionType
+| order by TimeGenerated asc
+
+* * *
+
+Format: Malware family name
 
 
 ## PowerShell commands (catches script-based changes):
