@@ -258,6 +258,43 @@ The file end in .Ink and launch by explorer.exe
     | distinct AccountName
 
 * * *
+### Try this query to find out 
+- ConnectionAttempt,
+- InboundConnectionAccepted
+- and the overlap = Attemp that made it into the machine. You will get the 3 out put
+
+let AllEvents = DeviceNetworkEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where LocalPort == 3389
+| where ActionType in ("ConnectionAttempt", "InboundConnectionAccepted");
+let Attempts = AllEvents
+| where ActionType == "ConnectionAttempt"
+| distinct RemoteIP;
+let Accepted = AllEvents
+| where ActionType == "InboundConnectionAccepted"
+| distinct RemoteIP;
+let Overlap = AllEvents
+| summarize ActionTypes = make_set(ActionType) by RemoteIP
+| where set_has_element(ActionTypes, "ConnectionAttempt")
+    and set_has_element(ActionTypes, "InboundConnectionAccepted")
+| distinct RemoteIP;
+union
+    (Attempts | summarize ConnectionAttempt_UniqueIPs = dcount(RemoteIP)),
+    (Accepted | summarize InboundAccepted_UniqueIPs = dcount(RemoteIP)),
+    (Overlap | summarize Both_Attempt_AND_Accepted = dcount(RemoteIP))
+
+This assume you know the device name and the port that was access, if not get it with this:
+DeviceNetworkEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where ActionType in ("InboundConnectionAccepted", "ConnectionAttempt")
+| where RemoteIPType == "Public"
+| summarize ConnectionCount = count() by LocalPort
+| order by ConnectionCount desc
+
+This will give you the port that was bruth forced, then use that port in the above query.
+* * *
 
 ### 02 — MFA Fatigue Detection
 
