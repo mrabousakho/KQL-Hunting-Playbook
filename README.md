@@ -316,7 +316,21 @@ AllEvents
 | evaluate ipv4_lookup(GeoTable, RemoteIP, network)
 | summarize UniqueCountries = dcount(country_name)
 
-### How many externally sourced authentication events were recorded for the device?
+### How many unique countries were associated with RDP-related authentication events for the device?
+let GeoTable =
+    externaldata(network:string, geoname_id:long, continent_code:string, 
+                 continent_name:string, country_iso_code:string, country_name:string)
+    [@"https://raw.githubusercontent.com/datasets/geoip2-ipv4/main/data/geoip2-ipv4.csv"]
+    with (format="csv");
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| where LogonType in ("RemoteInteractive", "Network")
+| distinct RemoteIP
+| evaluate ipv4_lookup(GeoTable, RemoteIP, network)
+| summarize UniqueCountries = dcount(country_name)
+
 
 DeviceLogonEvents
 | where DeviceName == "azwks-phtg-02"
