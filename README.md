@@ -161,7 +161,67 @@ DeviceEvents
 | project TimeGenerated, Command, FileName, FileOriginIP, InitiatingProcessAccountName
 | sort by TimeGenerated asc
 * * *
+## Device File Events
 
+## This is gold
+There is always the question of what is the first command
+Here is a powerful query for that
+DeviceProcessEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated >= datetime(2025-12-13)
+| where InitiatingProcessAccountName == "vmadminusername"
+| where InitiatingProcessCommandLine !contains "phtg_activity.ps1"
+| where FileName !in ("conhost.exe", "msedge.exe", "sihost.exe", 
+    "taskhostw.exe", "ctfmon.exe", "RuntimeBroker.exe")
+| project TimeGenerated, FileName, ProcessCommandLine, 
+    InitiatingProcessFileName, InitiatingProcessCommandLine
+| order by TimeGenerated asc
+* * *
+### Here is all the TEXT file that was touched:
+
+DeviceFileEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where InitiatingProcessAccountName =~ "vmadminusername"
+| where FileName endswith ".txt" or FileName endswith ".Txt"
+| summarize Count = count() by ActionType, FileName // comment out the Filename if you want just the total of all the actions
+| order by Count desc 
+* * *
+###  FileRenamed Events for Executable Extensions
+DeviceFileEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where InitiatingProcessAccountName =~ "vmadminusername"
+| where ActionType == "FileRenamed"
+| where FileName endswith ".exe" 
+    or FileName endswith ".bat" 
+    or FileName endswith ".ps1"
+    or FileName endswith ".cmd"
+    or FileName endswith ".vbs"
+    or FileName endswith ".dll"
+| project TimeGenerated, FileName, PreviousFileName, FolderPath, InitiatingProcessFileName
+| order by TimeGenerated asc
+
+* * *
+
+## File names lie. Hashes do not. What is the SHA256 of the payload file?
+DeviceFileEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where FileName in ("Sarah_Chen_Notes.exe", "Sarah_Chen_Notes.exe.Txt", "PHTG.exe")
+| where isnotempty(SHA256)
+| project TimeGenerated, FileName, SHA256, FolderPath, ActionType
+| order by TimeGenerated asc
+### if you know that hatches:
+
+DeviceFileEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where SHA256 == "224462ce5e3304e3fd0875eeabc829810a894911e3d4091d4e60e67a2687e695"
+| project TimeGenerated, ActionType, FileName, FolderPath
+| order by TimeGenerated asc
+
+* * *
 # Defender Exclusion Detection Has Multiple Paths
 ## Path 1 — Process execution (most common):
 DeviceProcessEvents
@@ -330,8 +390,6 @@ DeviceLogonEvents
 | distinct RemoteIP
 | evaluate ipv4_lookup(GeoTable, RemoteIP, network)
 | summarize UniqueCountries = dcount(country_name)
-
-
 DeviceLogonEvents
 | where DeviceName == "azwks-phtg-02"
 | where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
@@ -382,6 +440,59 @@ DeviceLogonEvents
 | summarize count() by FailureReason
 | order by count_ desc
 
+
+### Of those countries, how many had at least one successful authentication event?
+let GeoTable =
+    externaldata(network:string, geoname_id:long, continent_code:string, 
+                 continent_name:string, country_iso_code:string, country_name:string)
+    [@"https://raw.githubusercontent.com/datasets/geoip2-ipv4/main/data/geoip2-ipv4.csv"]
+    with (format="csv");
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| where LogonType in ("RemoteInteractive", "Network")
+| where ActionType == "LogonSuccess"
+| distinct RemoteIP
+| evaluate ipv4_lookup(GeoTable, RemoteIP, network)
+| summarize UniqueCountries = dcount(country_name)
+
+- - -
+### //Which countries were associated with successful RDP authentication events?
+let GeoTable =
+    externaldata(network:string, geoname_id:long, continent_code:string, 
+                 continent_name:string, country_iso_code:string, country_name:string)
+    [@"https://raw.githubusercontent.com/datasets/geoip2-ipv4/main/data/geoip2-ipv4.csv"]
+    with (format="csv");
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| where LogonType in ("RemoteInteractive", "Network")
+| where ActionType == "LogonSuccess"
+| distinct RemoteIP
+| evaluate ipv4_lookup(GeoTable, RemoteIP, network)
+| distinct country_name
+| order by country_name asc
+
+
+//How many successful RDP authentication events originated from the unexpected country?
+//Format: Number only
+
+let GeoTable =
+    externaldata(network:string, geoname_id:long, continent_code:string, 
+                 continent_name:string, country_iso_code:string, country_name:string)
+    [@"https://raw.githubusercontent.com/datasets/geoip2-ipv4/main/data/geoip2-ipv4.csv"]
+    with (format="csv");
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| where LogonType in ("RemoteInteractive", "Network")
+| where ActionType == "LogonSuccess"
+| evaluate ipv4_lookup(GeoTable, RemoteIP, network)
+| where country_name == "Uruguay"
+| summarize count()
 * * *
 
 ### 03 — Impossible Travel Detection
@@ -397,7 +508,7 @@ DeviceLogonEvents
               Country, City, AppDisplayName
     | sort by TimeGenerated asc
 
-* * *
+
 
 ### 04 — Session Fingerprint Comparison
 
