@@ -324,6 +324,16 @@ DeviceLogonEvents
 | where RemoteIPType == "Public"
 | summarize count()
 
+### Here is the breakdown : 
+
+// summarise device logon actions
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| summarize count() by ActionType, LogonType
+| order by count_ desc
+
 * * *
 
 ### 02 — MFA Fatigue Detection
