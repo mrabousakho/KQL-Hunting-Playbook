@@ -294,6 +294,36 @@ DeviceNetworkEvents
 | order by ConnectionCount desc
 
 This will give you the port that was bruth forced, then use that port in the above query.
+
+### where in the world is the noise coming from ? How many distinct countries are associated with 
+that RDP connection activity?
+
+let GeoTable =
+    externaldata(network:string, geoname_id:long, continent_code:string, 
+                 continent_name:string, country_iso_code:string, country_name:string)
+    [@"https://raw.githubusercontent.com/datasets/geoip2-ipv4/main/data/geoip2-ipv4.csv"]
+    with (format="csv");
+let AllEvents = DeviceNetworkEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where LocalPort == 3389
+| where ActionType in ("ConnectionAttempt", "InboundConnectionAccepted")
+| summarize ActionTypes = make_set(ActionType) by RemoteIP
+| where set_has_element(ActionTypes, "ConnectionAttempt")
+    and set_has_element(ActionTypes, "InboundConnectionAccepted")
+| distinct RemoteIP;
+AllEvents
+| evaluate ipv4_lookup(GeoTable, RemoteIP, network)
+| summarize UniqueCountries = dcount(country_name)
+
+### How many externally sourced authentication events were recorded for the device?
+
+DeviceLogonEvents
+| where DeviceName == "azwks-phtg-02"
+| where TimeGenerated between (datetime(2025-12-09) .. datetime(2025-12-23))
+| where RemoteIPType == "Public"
+| summarize count()
+
 * * *
 
 ### 02 — MFA Fatigue Detection
