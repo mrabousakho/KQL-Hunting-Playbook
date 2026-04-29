@@ -113,41 +113,49 @@ DeviceLogonEvents
 ```kql
 // Complete attacker session profiler
 // Combines logon data + process activity + file activity in one result
-let AttackerDevice = "ATTACKER_DEVICE_NAME";
 
-// Logon summary
-let Logons = DeviceLogonEvents
-| where RemoteDeviceName =~ AttackerDevice
-| summarize
-    SuccessfulLogons = countif(ActionType == "LogonSuccess"),
-    FailedLogons = countif(ActionType == "LogonFailed"),
-    LogonTypes = make_set(LogonType),
-    IPsUsed = make_set(RemoteIP),
-    FirstLogon = min(TimeGenerated),
-    LastLogon = max(TimeGenerated)
-    by DeviceName;
+let AttackerDevice = "ATTACKER_DEVICE_NAME"; // e.g sarah-che
+let StartTime = datetime(); // e.g 2025-12-09
+let EndTime = datetime(); // e.g 2025-12-23
 
-// Process activity
-let Processes = DeviceProcessEvents
-| where IsInitiatingProcessRemoteSession == true
-| where InitiatingProcessRemoteSessionDeviceName =~ AttackerDevice
-| summarize
-    ProcessCount = count(),
-    UniqueCommands = dcount(ProcessCommandLine),
-    TopCommands = make_set(ProcessCommandLine, 5)
-    by DeviceName;
+let Logons = (
+    DeviceLogonEvents
+    | where TimeGenerated between (StartTime .. EndTime)
+    | where RemoteDeviceName contains AttackerDevice
+    | summarize
+        SuccessfulLogons = countif(ActionType == "LogonSuccess"),
+        FailedLogons = countif(ActionType == "LogonFailed"),
+        LogonTypes = make_set(LogonType),
+        IPsUsed = make_set(RemoteIP),
+        FirstLogon = min(TimeGenerated),
+        LastLogon = max(TimeGenerated)
+        by DeviceName
+);
 
-// File activity
-let Files = DeviceFileEvents
-| where IsInitiatingProcessRemoteSession == true
-| where InitiatingProcessRemoteSessionDeviceName =~ AttackerDevice
-| summarize
-    FilesCreated = countif(ActionType == "FileCreated"),
-    FilesDeleted = countif(ActionType == "FileDeleted"),
-    FileNames = make_set(FileName, 10)
-    by DeviceName;
+let Processes = (
+    DeviceProcessEvents
+    | where TimeGenerated between (StartTime .. EndTime)
+    | where IsInitiatingProcessRemoteSession == true
+    | where InitiatingProcessRemoteSessionDeviceName contains AttackerDevice
+    | summarize
+        ProcessCount = count(),
+        UniqueCommands = dcount(ProcessCommandLine),
+        TopCommands = make_set(ProcessCommandLine, 5)
+        by DeviceName
+);
 
-// Combine everything
+let Files = (
+    DeviceFileEvents
+    | where TimeGenerated between (StartTime .. EndTime)
+    | where IsInitiatingProcessRemoteSession == true
+    | where InitiatingProcessRemoteSessionDeviceName contains AttackerDevice
+    | summarize
+        FilesCreated = countif(ActionType == "FileCreated"),
+        FilesDeleted = countif(ActionType == "FileDeleted"),
+        FileNames = make_set(FileName, 10)
+        by DeviceName
+);
+
 Logons
 | join kind=leftouter Processes on DeviceName
 | join kind=leftouter Files on DeviceName
